@@ -41,13 +41,13 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
+      - name: Remove excluded paths
+        run: rm -rf ./node_modules
+
       - name: Upload Build Artifacts
         uses: actions/upload-pages-artifact@v3
         with:
-          path: |
-            './'
-            '!./.git/'
-            '!./node_modules/'
+          path: './'
 
       - name: Deploy to GitHub Pages
         id: deployment
