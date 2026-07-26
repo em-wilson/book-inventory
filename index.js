@@ -302,8 +302,8 @@ const els = {
       if (capabilities.zoom) {
         els.zoomInput.min = capabilities.zoom.min ?? 1;
         els.zoomInput.max = capabilities.zoom.max ?? 1;
-        els.zoomInput.step = capabilities.zoom.step ?? defaultZoom;
-        els.zoomInput.value = settings.zoom ?? capabilities.zoom.min ?? 1;
+        els.zoomInput.step = capabilities.zoom.step ?? 0.1;
+        els.zoomInput.value = settings.zoom ?? capabilities.zoom.min ?? defaultZoom;
         els.zoomControl.classList.add("visible");
         hasControls = true;
       }
@@ -445,6 +445,7 @@ const els = {
     async function applyZoom() {
       if (!activeVideoTrack) return;
       try {
+        console.log('new zoom level ' + els.zoomInput.value);
         await activeVideoTrack.applyConstraints({ advanced: [{ zoom: Number(els.zoomInput.value) }] });
       } catch {
         setMessage("This camera would not accept that zoom level.", "warn");
