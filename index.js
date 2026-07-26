@@ -2,7 +2,7 @@ import { BrowserMultiFormatReader, BrowserMultiFormatOneDReader } from '@zxing/b
 import { BarcodeFormat, DecodeHintType } from '@zxing/library';
 
 
-const defaultZoom = 0.2;
+const defaultZoom = 1;
 
 const els = {
       addBtn: document.querySelector("#addBtn"),
