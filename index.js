@@ -1,6 +1,9 @@
 import { BrowserMultiFormatReader, BrowserMultiFormatOneDReader } from '@zxing/browser';
 import { BarcodeFormat, DecodeHintType } from '@zxing/library';
 
+
+const defaultZoom = 0.2;
+
 const els = {
       addBtn: document.querySelector("#addBtn"),
       bookForm: document.querySelector("#bookForm"),
@@ -281,7 +284,12 @@ const els = {
       if (!activeVideoTrack) return;
 
       try {
-        await activeVideoTrack.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+        await activeVideoTrack.applyConstraints({ advanced: [
+            {
+                focusMode: "continuous",
+                zoom: Number(defaultZoom)
+            }
+        ]});
       } catch {
         // Some mobile browsers ignore or reject focus constraints.
       }
@@ -293,7 +301,7 @@ const els = {
       if (capabilities.zoom) {
         els.zoomInput.min = capabilities.zoom.min ?? 1;
         els.zoomInput.max = capabilities.zoom.max ?? 1;
-        els.zoomInput.step = capabilities.zoom.step ?? 0.1;
+        els.zoomInput.step = capabilities.zoom.step ?? defaultZoom;
         els.zoomInput.value = settings.zoom ?? capabilities.zoom.min ?? 1;
         els.zoomControl.classList.add("visible");
         hasControls = true;
