@@ -1,0 +1,27 @@
+{
+  "name": "book-inventory",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "esbuild index.js --bundle --minify --outfile=dist/bundle.js",
+    "watch": "esbuild index.js --bundle --outfile=dist/bundle.js --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/em-wilson/book-inventory.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/em-wilson/book-inventory/issues"
+  },
+  "homepage": "https://github.com/em-wilson/book-inventory#readme",
+  "dependencies": {
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
+  }
+}
