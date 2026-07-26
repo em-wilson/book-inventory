@@ -24,7 +24,6 @@ const els = {
       summary: document.querySelector("#summary"),
       tableWrap: document.querySelector("#tableWrap"),
       cameraControls: document.querySelector("#cameraControls"),
-      photoBtn: document.querySelector("#photoBtn"),
       photoInput: document.querySelector("#photoInput"),
       torchBtn: document.querySelector("#torchBtn"),
       zoomControl: document.querySelector("#zoomControl"),
@@ -613,7 +612,6 @@ const els = {
     els.printBtn.addEventListener("click", () => window.print());
     els.exportBtn.addEventListener("click", exportCsv);
     els.clearBtn.addEventListener("click", clearInventory);
-    els.photoBtn.addEventListener("click", () => els.photoInput.click());
     els.photoInput.addEventListener("change", scanPhoto);
     els.zoomInput.addEventListener("input", applyZoom);
     els.torchBtn.addEventListener("click", toggleTorch);
