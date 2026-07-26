@@ -259,6 +259,10 @@
       display: grid;
     }
 
+    .camera-controls .btn {
+      flex: 0 0 auto;
+    }
+
     .camera-controls input[type="range"] {
       min-height: 28px;
       padding: 0;
@@ -566,6 +570,11 @@
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 2h6l-1 8h4l-7 12 1-9H7L9 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
             Light
           </button>
+          <button class="btn ghost" id="photoBtn" type="button" title="Scan a photo">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h3l2-3h6l2 3h3v13H4V7Zm8 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+            Photo
+          </button>
+          <input id="photoInput" type="file" accept="image/*" capture="environment" hidden>
         </div>
 
         <form class="form" id="bookForm">
@@ -641,6 +650,8 @@
       summary: document.querySelector("#summary"),
       tableWrap: document.querySelector("#tableWrap"),
       cameraControls: document.querySelector("#cameraControls"),
+      photoBtn: document.querySelector("#photoBtn"),
+      photoInput: document.querySelector("#photoInput"),
       torchBtn: document.querySelector("#torchBtn"),
       zoomControl: document.querySelector("#zoomControl"),
       zoomInput: document.querySelector("#zoomInput"),
@@ -833,12 +844,13 @@
 
     async function startZxingScan() {
       try {
-        zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
+        zxingReader = createOneDimensionalReader();
         scanning = true;
         els.scanner.classList.add("active");
+        els.cameraControls.classList.add("visible");
         els.scanBtn.lastChild.textContent = " Stop";
-        els.scannerStatus.textContent = "Point the camera at the book barcode.";
-        setMessage("Scanning...");
+        els.scannerStatus.textContent = "Center only the main ISBN/UPC bars. Keep it sharp and fill about half the view.";
+        setMessage("Scanning for ISBN/UPC bars...");
 
         zxingControls = await zxingReader.decodeFromConstraints({
           video: {
@@ -921,7 +933,7 @@
         els.torchBtn.style.display = "none";
       }
 
-      els.cameraControls.classList.toggle("visible", hasControls);
+      els.cameraControls.classList.add("visible");
     }
 
     function resetCameraControls() {
@@ -931,6 +943,56 @@
       els.zoomControl.classList.remove("visible");
       els.torchBtn.style.display = "none";
       els.torchBtn.classList.remove("primary");
+    }
+
+    function createOneDimensionalReader() {
+      const hints = new Map();
+      if (ZXingBrowser.DecodeHintType?.TRY_HARDER) {
+        hints.set(ZXingBrowser.DecodeHintType.TRY_HARDER, true);
+      }
+      if (ZXingBrowser.DecodeHintType?.POSSIBLE_FORMATS && ZXingBrowser.BarcodeFormat) {
+        const formats = [
+          ZXingBrowser.BarcodeFormat.EAN_13,
+          ZXingBrowser.BarcodeFormat.EAN_8,
+          ZXingBrowser.BarcodeFormat.UPC_A,
+          ZXingBrowser.BarcodeFormat.UPC_E
+        ].filter(format => format !== undefined);
+        if (formats.length) {
+          hints.set(ZXingBrowser.DecodeHintType.POSSIBLE_FORMATS, formats);
+        }
+      }
+      return new ZXingBrowser.BrowserMultiFormatOneDReader(hints);
+    }
+
+    async function scanPhoto(event) {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      if (!file) return;
+
+      if (!window.ZXingBrowser?.BrowserMultiFormatOneDReader) {
+        setMessage("Photo scanning could not load. Type the ISBN or UPC instead.", "warn");
+        return;
+      }
+
+      const image = new Image();
+      const url = URL.createObjectURL(file);
+      image.src = url;
+      setMessage("Scanning photo...");
+
+      try {
+        await image.decode();
+        const reader = createOneDimensionalReader();
+        const result = await reader.decodeFromImageElement(image);
+        const raw = normalizeCode(result?.getText?.());
+        if (!raw) throw new Error("No barcode result");
+        els.codeInput.value = raw;
+        await lookupBook(raw);
+        els.locationInput.focus();
+      } catch {
+        setMessage("No UPC/ISBN found in that photo. Try filling the photo with the barcode while keeping it sharp.", "warn");
+      } finally {
+        URL.revokeObjectURL(url);
+      }
     }
 
     async function applyZoom() {
@@ -1103,6 +1165,8 @@
     els.printBtn.addEventListener("click", () => window.print());
     els.exportBtn.addEventListener("click", exportCsv);
     els.clearBtn.addEventListener("click", clearInventory);
+    els.photoBtn.addEventListener("click", () => els.photoInput.click());
+    els.photoInput.addEventListener("change", scanPhoto);
     els.zoomInput.addEventListener("input", applyZoom);
     els.torchBtn.addEventListener("click", toggleTorch);
     els.searchInput.addEventListener("input", renderInventory);
