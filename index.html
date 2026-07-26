@@ -233,6 +233,37 @@
       background: #17202b;
     }
 
+    .camera-controls {
+      display: none;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 18px;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .camera-controls.visible {
+      display: flex;
+    }
+
+    .camera-controls label {
+      flex: 1 1 160px;
+      display: none;
+      grid-template-columns: auto minmax(90px, 1fr);
+      gap: 10px;
+      align-items: center;
+      font-size: 0.82rem;
+    }
+
+    .camera-controls label.visible {
+      display: grid;
+    }
+
+    .camera-controls input[type="range"] {
+      min-height: 28px;
+      padding: 0;
+    }
+
     .form {
       padding: 18px;
       display: grid;
@@ -526,6 +557,17 @@
           <div class="scan-line" aria-hidden="true"></div>
         </div>
 
+        <div class="camera-controls" id="cameraControls">
+          <label id="zoomControl">
+            Zoom
+            <input id="zoomInput" type="range" min="1" max="1" step="0.1" value="1">
+          </label>
+          <button class="btn ghost" id="torchBtn" type="button" title="Toggle light">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 2h6l-1 8h4l-7 12 1-9H7L9 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+            Light
+          </button>
+        </div>
+
         <form class="form" id="bookForm">
           <div class="row">
             <label>
@@ -598,6 +640,10 @@
       searchInput: document.querySelector("#searchInput"),
       summary: document.querySelector("#summary"),
       tableWrap: document.querySelector("#tableWrap"),
+      cameraControls: document.querySelector("#cameraControls"),
+      torchBtn: document.querySelector("#torchBtn"),
+      zoomControl: document.querySelector("#zoomControl"),
+      zoomInput: document.querySelector("#zoomInput"),
       video: document.querySelector("#video")
     };
 
@@ -608,6 +654,8 @@
     let detector = null;
     let zxingReader = null;
     let zxingControls = null;
+    let activeVideoTrack = null;
+    let torchOn = false;
     let scanning = false;
     let lastDetected = "";
 
@@ -760,13 +808,21 @@
     async function startNativeScan() {
       try {
         detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"] });
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            frameRate: { ideal: 30 }
+          }
+        });
         els.video.srcObject = stream;
         await els.video.play();
+        await setupCameraEnhancements();
         scanning = true;
         els.scanner.classList.add("active");
         els.scanBtn.lastChild.textContent = " Stop";
-        els.scannerStatus.textContent = "Point the camera at the book barcode.";
+        els.scannerStatus.textContent = "Hold the book farther back if the bars blur, then zoom in.";
         setMessage("Scanning...");
         scanLoop();
       } catch (error) {
@@ -787,8 +843,9 @@
         zxingControls = await zxingReader.decodeFromConstraints({
           video: {
             facingMode: { ideal: "environment" },
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            frameRate: { ideal: 30 }
           }
         }, els.video, (result, error, controls) => {
           const raw = normalizeCode(result?.getText?.());
@@ -801,6 +858,7 @@
           stopScan();
           lookupBook(raw).then(() => els.locationInput.focus());
         });
+        await setupCameraEnhancements();
       } catch (error) {
         scanning = false;
         zxingReader = null;
@@ -814,6 +872,7 @@
 
     function stopScan() {
       scanning = false;
+      resetCameraControls();
       if (zxingControls?.stop) {
         zxingControls.stop();
       }
@@ -830,6 +889,70 @@
       els.scanner.classList.remove("active");
       els.scanBtn.lastChild.textContent = " Scan";
       els.scannerStatus.textContent = "Scanner stopped. Start it again or enter a code manually.";
+    }
+
+    async function setupCameraEnhancements() {
+      activeVideoTrack = els.video.srcObject?.getVideoTracks?.()[0] || stream?.getVideoTracks?.()[0] || null;
+      if (!activeVideoTrack) return;
+
+      try {
+        await activeVideoTrack.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+      } catch {
+        // Some mobile browsers ignore or reject focus constraints.
+      }
+
+      const capabilities = activeVideoTrack.getCapabilities?.() || {};
+      const settings = activeVideoTrack.getSettings?.() || {};
+      let hasControls = false;
+
+      if (capabilities.zoom) {
+        els.zoomInput.min = capabilities.zoom.min ?? 1;
+        els.zoomInput.max = capabilities.zoom.max ?? 1;
+        els.zoomInput.step = capabilities.zoom.step ?? 0.1;
+        els.zoomInput.value = settings.zoom ?? capabilities.zoom.min ?? 1;
+        els.zoomControl.classList.add("visible");
+        hasControls = true;
+      }
+
+      if (capabilities.torch) {
+        els.torchBtn.style.display = "inline-flex";
+        hasControls = true;
+      } else {
+        els.torchBtn.style.display = "none";
+      }
+
+      els.cameraControls.classList.toggle("visible", hasControls);
+    }
+
+    function resetCameraControls() {
+      activeVideoTrack = null;
+      torchOn = false;
+      els.cameraControls.classList.remove("visible");
+      els.zoomControl.classList.remove("visible");
+      els.torchBtn.style.display = "none";
+      els.torchBtn.classList.remove("primary");
+    }
+
+    async function applyZoom() {
+      if (!activeVideoTrack) return;
+      try {
+        await activeVideoTrack.applyConstraints({ advanced: [{ zoom: Number(els.zoomInput.value) }] });
+      } catch {
+        setMessage("This camera would not accept that zoom level.", "warn");
+      }
+    }
+
+    async function toggleTorch() {
+      if (!activeVideoTrack) return;
+      torchOn = !torchOn;
+      try {
+        await activeVideoTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
+        els.torchBtn.classList.toggle("primary", torchOn);
+      } catch {
+        torchOn = false;
+        els.torchBtn.classList.remove("primary");
+        setMessage("This camera would not turn on the light from the browser.", "warn");
+      }
     }
 
     async function scanLoop() {
@@ -980,6 +1103,8 @@
     els.printBtn.addEventListener("click", () => window.print());
     els.exportBtn.addEventListener("click", exportCsv);
     els.clearBtn.addEventListener("click", clearInventory);
+    els.zoomInput.addEventListener("input", applyZoom);
+    els.torchBtn.addEventListener("click", toggleTorch);
     els.searchInput.addEventListener("input", renderInventory);
     els.codeInput.addEventListener("keydown", event => {
       if (event.key === "Enter") {
