@@ -577,6 +577,7 @@
     </section>
   </main>
 
+  <script src="https://unpkg.com/@zxing/browser@0.2.1/umd/zxing-browser.min.js"></script>
   <script>
     const els = {
       addBtn: document.querySelector("#addBtn"),
@@ -605,6 +606,8 @@
     let currentBook = null;
     let stream = null;
     let detector = null;
+    let zxingReader = null;
+    let zxingControls = null;
     let scanning = false;
     let lastDetected = "";
 
@@ -732,13 +735,29 @@
         return;
       }
 
-      if (!("BarcodeDetector" in window)) {
-        els.scanner.classList.add("unsupported");
-        els.scannerStatus.textContent = "This browser does not support live barcode detection. Manual entry is ready below.";
-        setMessage("Barcode scanning is not supported in this browser. Type the ISBN or UPC instead.", "warn");
+      if ("BarcodeDetector" in window) {
+        await startNativeScan();
         return;
       }
 
+      if (window.ZXingBrowser?.BrowserMultiFormatReader) {
+        await startZxingScan();
+        return;
+      }
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        els.scanner.classList.add("unsupported");
+        els.scannerStatus.textContent = "This browser does not provide camera access. Manual entry is ready below.";
+        setMessage("Camera scanning is not available in this browser. Type the ISBN or UPC instead.", "warn");
+        return;
+      }
+
+      els.scanner.classList.add("unsupported");
+      els.scannerStatus.textContent = "The barcode scanner library could not load. Manual entry is ready below.";
+      setMessage("Scanner support could not load. Check your connection or type the ISBN/UPC instead.", "warn");
+    }
+
+    async function startNativeScan() {
       try {
         detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"] });
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
@@ -756,8 +775,53 @@
       }
     }
 
+    async function startZxingScan() {
+      try {
+        zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
+        scanning = true;
+        els.scanner.classList.add("active");
+        els.scanBtn.lastChild.textContent = " Stop";
+        els.scannerStatus.textContent = "Point the camera at the book barcode.";
+        setMessage("Scanning...");
+
+        zxingControls = await zxingReader.decodeFromConstraints({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        }, els.video, (result, error, controls) => {
+          const raw = normalizeCode(result?.getText?.());
+          if (!raw || raw === lastDetected) return;
+
+          lastDetected = raw;
+          controls?.stop?.();
+          zxingControls = null;
+          els.codeInput.value = raw;
+          stopScan();
+          lookupBook(raw).then(() => els.locationInput.focus());
+        });
+      } catch (error) {
+        scanning = false;
+        zxingReader = null;
+        zxingControls = null;
+        els.scanner.classList.remove("active");
+        els.scanBtn.lastChild.textContent = " Scan";
+        els.scannerStatus.textContent = "Camera access was not available. Manual entry is ready below.";
+        setMessage("Camera access was blocked or unavailable. Type the ISBN or UPC instead.", "warn");
+      }
+    }
+
     function stopScan() {
       scanning = false;
+      if (zxingControls?.stop) {
+        zxingControls.stop();
+      }
+      if (zxingReader?.reset) {
+        zxingReader.reset();
+      }
+      zxingControls = null;
+      zxingReader = null;
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
