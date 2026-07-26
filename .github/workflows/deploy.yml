@@ -43,6 +43,8 @@ jobs:
 
       - name: Upload Build Artifacts
         uses: actions/upload-pages-artifact@v3
+        with:
+          path: './' 
 
       - name: Deploy to GitHub Pages
         id: deployment
