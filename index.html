@@ -448,7 +448,10 @@
     function createOneDimensionalReader() {
       const hints = new Map();
       if (ZXingBrowser.DecodeHintType?.TRY_HARDER) {
+         alert('trying harder');
         hints.set(ZXingBrowser.DecodeHintType.TRY_HARDER, true);
+      } else {
+        alert('not trying very hard');
       }
       if (ZXingBrowser.DecodeHintType?.POSSIBLE_FORMATS && ZXingBrowser.BarcodeFormat) {
         const formats = [
