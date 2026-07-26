@@ -283,7 +283,6 @@ const els = {
       if (!activeVideoTrack) return;
 
       try {
-        alert('zoom level ' + defaultZoom );
         await activeVideoTrack.applyConstraints({ advanced: [
             {
                 focusMode: "continuous",
@@ -292,7 +291,6 @@ const els = {
         ]});
       } catch {
         // Some mobile browsers ignore or reject focus constraints.
-        alert('rejected constraints');
       }
 
       const capabilities = activeVideoTrack.getCapabilities?.() || {};
